@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 2.8.4)
 project(Nginx)
-set(CMAKE_C_COMPILER gcc)
+set(CMAKE_C_COMPILER clang)
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pipe  -O -W -Wall -Wpointer-arith -Wno-unused-parameter -Werror -g ")
 
 #Core Includes:
 include_directories(src/core)
@@ -26,15 +27,18 @@ include_directories(objs)
 #aux_source_directory(src/http/modules DIR_SRCS)
 
 # 用于自动执行子目录objs等
-add_subdirectory(objs)
+add_subdirectory(config)
 add_subdirectory(src/event)
 add_subdirectory(src/event/modules)
 add_subdirectory(src/http)
 add_subdirectory(src/http/modules)
 add_subdirectory(src/os/unix)
 
+#增加生成nginx的任务
 aux_source_directory(src/core DIR_SRCS)
 add_executable(nginx ${DIR_SRCS})
+
+#nginx依赖以下库
 target_link_libraries(nginx Config)
 target_link_libraries(nginx Event)
 target_link_libraries(nginx EventModules)
