@@ -1,0 +1,1 @@
+add_library(Config ngx_modules.c)
