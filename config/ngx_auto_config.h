@@ -1,4 +1,8 @@
-#define NGX_CONFIGURE ""
+#define NGX_CONFIGURE " --with-debug"
+
+#ifndef NGX_DEBUG
+#define NGX_DEBUG  1
+#endif
 
 #ifndef NGX_COMPILER
 #define NGX_COMPILER  "gcc 4.8.4 (Ubuntu 4.8.4-2ubuntu1~14.04.1) "

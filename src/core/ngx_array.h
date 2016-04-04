@@ -9,16 +9,19 @@
 #define _NGX_ARRAY_H_INCLUDED_
 
 
-#include <ngx_config.h>
+//#include <ngx_config.h>
 #include <ngx_core.h>
 
-
+/**
+ * @brief Ngx定义的数组类型结构体
+ * @ingroup structs
+ */
 typedef struct {
-    void        *elts;
-    ngx_uint_t   nelts;
-    size_t       size;
-    ngx_uint_t   nalloc;
-    ngx_pool_t  *pool;
+    void        *elts;  /**<成员变量1*/
+    ngx_uint_t   nelts; /**<成员变量2*/
+    size_t       size;  /**<长度*/
+    ngx_uint_t   nalloc;/**<成员变量4*/
+    ngx_pool_t  *pool;  /**<成员变量5*/
 } ngx_array_t;
 
 

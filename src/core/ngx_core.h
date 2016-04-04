@@ -1,7 +1,8 @@
 
-/*
- * Copyright (C) Igor Sysoev
- * Copyright (C) Nginx, Inc.
+/**
+ * @file ngx_core.h
+ * @brief ngx_core.h包含了项目下几乎所有的头文件
+ * 其他文件通过#include<ngx_core.h>来间接包含其他头文件,此文件共 171 usages!
  */
 
 

@@ -9,7 +9,7 @@
 #define _NGX_ATOMIC_H_INCLUDED_
 
 
-#include <ngx_config.h>
+//#include <ngx_config.h>
 #include <ngx_core.h>
 
 

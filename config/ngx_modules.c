@@ -1,14 +1,18 @@
 
-#include <ngx_config.h>
+//#include <ngx_config.h>
 #include <ngx_core.h>
 
 
-
-extern ngx_module_t  ngx_core_module;
-extern ngx_module_t  ngx_errlog_module;
-extern ngx_module_t  ngx_conf_module;
-extern ngx_module_t  ngx_regex_module;
-extern ngx_module_t  ngx_events_module;
+/********************************/
+/**
+ * @name 导入模块结构体定义
+ * @{
+ */
+extern ngx_module_t  ngx_core_module;   ///<core模块
+extern ngx_module_t  ngx_errlog_module; ///<errorlog模块
+extern ngx_module_t  ngx_conf_module;   ///<配置模块
+extern ngx_module_t  ngx_regex_module;  ///<正则表达式模块
+extern ngx_module_t  ngx_events_module; ///<事件处理模块
 extern ngx_module_t  ngx_event_core_module;
 extern ngx_module_t  ngx_epoll_module;
 extern ngx_module_t  ngx_http_module;
@@ -52,6 +56,7 @@ extern ngx_module_t  ngx_http_headers_filter_module;
 extern ngx_module_t  ngx_http_copy_filter_module;
 extern ngx_module_t  ngx_http_range_body_filter_module;
 extern ngx_module_t  ngx_http_not_modified_filter_module;
+/**@}**********************************/
 
 ngx_module_t *ngx_modules[] = {
     &ngx_core_module,

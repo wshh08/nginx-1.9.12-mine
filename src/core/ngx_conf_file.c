@@ -5,7 +5,7 @@
  */
 
 
-#include <ngx_config.h>
+//#include <ngx_config.h>
 #include <ngx_core.h>
 
 #define NGX_CONF_BUFFER  4096

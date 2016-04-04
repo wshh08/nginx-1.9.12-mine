@@ -190,6 +190,10 @@ ngx_module_t  ngx_event_core_module = {
 };
 
 
+/**
+ * @brief ngx_process_events_and_timers是Nginx的事件模块的核心方法(管干活的,维修部经理^_^)
+ * @ingroup funcs
+ * */
 void
 ngx_process_events_and_timers(ngx_cycle_t *cycle)
 {

@@ -69,6 +69,13 @@ static ngx_log_t        ngx_exit_log;
 static ngx_open_file_t  ngx_exit_log_file;
 
 
+/**
+ * @brief 在执行nginx.c文件中的main函数启动流程时将会根据配置文件要求调用此函数以启动master/worker
+ * 工作模式的master进程,在此函数中将调用ngx_start_worker_processes函数以启动配置文件中指定数量的worker进程
+ * @param[in] 传入在nginx.c的main函数内初始化过的ngx_cycle_t对象:cycle
+ * @return void
+ * @ingroup funcs
+ */
 void
 ngx_master_process_cycle(ngx_cycle_t *cycle)
 {
@@ -125,8 +132,16 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
     ngx_setproctitle(title);
 
 
+    // ngx_core_conf_t在ngx_cycle中定义,表示存储nginx.con中配置项的结构体类型
+    // ccf为调用ngx_get_conf宏得到的ngx_core_module模块相关配置内容
+    // ngx_get_conf宏在ngx_conf_file中定义:#define ngx_get_conf(conf_ctx, module) conf_ctx[module.index]
+    // cycle->conf_ctx保存着'所有模块'的'存储配置项的结构体'的指针,
+    // 它是一个存储着"指向另一个'指针数组'的指针"的数组:void ****conf_ctx
+    // ccf仅包含ngx_core_module模块的配置项
     ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
 
+    // 根据配置文件中设置的工作进程数量启动worker进程,
+    // cycle还是在main函数中通过ngx_init_cycle函数初始化后的那个ngx_cycle_t对象(master进程的ngx_cycle_t对象).
     ngx_start_worker_processes(cycle, ccf->worker_processes,
                                NGX_PROCESS_RESPAWN);
     ngx_start_cache_manager_processes(cycle, 0);
@@ -160,6 +175,7 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
 
         ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "sigsuspend");
 
+        // 挂起master进程，直到有新信号来
         sigsuspend(&set);
 
         ngx_time_update();
@@ -284,6 +300,9 @@ ngx_master_process_cycle(ngx_cycle_t *cycle)
 }
 
 
+/**
+ *@ingroup funcs
+ */
 void
 ngx_single_process_cycle(ngx_cycle_t *cycle)
 {
@@ -341,6 +360,12 @@ ngx_single_process_cycle(ngx_cycle_t *cycle)
 }
 
 
+/**
+ * @param[in] *cycle
+ * @param[in] n 需要开启的子进程数量
+ * @param[in] type
+ * @ingroup funcs
+ */
 static void
 ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n, ngx_int_t type)
 {
@@ -354,10 +379,14 @@ ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n, ngx_int_t type)
     ch.command = NGX_CMD_OPEN_CHANNEL;
 
     for (i = 0; i < n; i++) {
-
+        // ngx_spawn_process函数:封装fork系统调用,用来启动一个子进程
+        // ngx_worker_process_cycle函数指针指向在worker工作进程中执行的工作循环代码.
+        // 在ngx_spawn_process函数中,fork成功后将会调用ngx_worker_process_cycle(cycle, data)
+        // 其中cycle就是传给ngx_spawn_process函数的cycle指针, data就是"(void *) (intptr_t) i",代表worker进程的编号?
         ngx_spawn_process(cycle, ngx_worker_process_cycle,
                           (void *) (intptr_t) i, "worker process", type);
 
+        // ngx_processes[NGX_MAX_PROCESSES]数组为ngx_process.h文件中定义的全局数组,用来存储master进程的所有子进程信息.
         ch.pid = ngx_processes[ngx_process_slot].pid;
         ch.slot = ngx_process_slot;
         ch.fd = ngx_processes[ngx_process_slot].channel[0];
@@ -451,6 +480,9 @@ ngx_pass_open_channel(ngx_cycle_t *cycle, ngx_channel_t *ch)
 }
 
 
+/**
+ *@ingroup funcs
+ */
 static void
 ngx_signal_worker_processes(ngx_cycle_t *cycle, int signo)
 {
@@ -723,6 +755,9 @@ ngx_master_process_exit(ngx_cycle_t *cycle)
 }
 
 
+/**
+ *@ingroup funcs
+ */
 static void
 ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
 {
@@ -750,6 +785,7 @@ ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
 
         ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "worker cycle");
 
+        // ngx_process_events_and_timers函数为Nginx事件模块的核心方法,用来处理各种事件(真正干活的是他).
         ngx_process_events_and_timers(cycle);
 
         if (ngx_terminate) {
@@ -780,6 +816,9 @@ ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
 }
 
 
+/**
+ *@ingroup funcs
+ */
 static void
 ngx_worker_process_init(ngx_cycle_t *cycle, ngx_int_t worker)
 {
@@ -943,6 +982,9 @@ ngx_worker_process_init(ngx_cycle_t *cycle, ngx_int_t worker)
 }
 
 
+/**
+ *@ingroup funcs
+ */
 static void
 ngx_worker_process_exit(ngx_cycle_t *cycle)
 {

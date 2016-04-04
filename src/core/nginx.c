@@ -1,11 +1,25 @@
 
-/*
- * Copyright (C) Igor Sysoev
- * Copyright (C) Nginx, Inc.
+/**
+ * @mainpage Nginx代码分析
+ * @section 介绍
+ *      -# nginx是一个高性能web服务器
+ *      -# 通过分析其源码积累大型软件项目经验
+ *      -# 了解高性能web服务器实现原理
+ *      -# 了解linux编程相关知识
+ *      -# 了解Http等相关网络协议原理
+ *      -# 熟悉c语言语法等相关知识点
+ *      -# 对比结构语言与面向对象语言编程区别
+ *      -# 对比编译语言和解释语言区别
+ * @section 内容
+ *      -# @ref funcs "函数集锦"
+ *      -# @ref structs "数据结构集锦"
+ * @defgroup funcs 函数集锦
+ * @defgroup structs 数据结构集锦
+ * 列示出所有重要数据结构
  */
 
-
-#include <ngx_config.h>
+//因为ngx_core.h中include了ngx_config.h,所以此处不需再include.
+//#include <ngx_config.h>
 #include <ngx_core.h>
 #include <nginx.h>
 
@@ -171,25 +185,38 @@ ngx_module_t  ngx_core_module = {
 };
 
 
+// static修饰的全局变量仅会在本文件中(从定义处到文件结尾)可见.
 static ngx_uint_t   ngx_show_help;
 static ngx_uint_t   ngx_show_version;
 static ngx_uint_t   ngx_show_configure;
 static u_char      *ngx_prefix;
 static u_char      *ngx_conf_file;
 static u_char      *ngx_conf_params;
-static char        *ngx_signal;
+static char        *ngx_signal;   ///< 未被初始化的static变量将被编译器默认赋0
 
 
 static char **ngx_os_environ;
 
-
+/**
+ * @brief程序入口 main函数 ngx_master_process_cycle-->ngx_start_worker_process-->ngx_worker_process_cycle
+ * @param[in] argc
+ * @param[in] *argv
+ * @return 0
+ * @see ::ngx_init_cycle
+ * @see ::ngx_master_process_cycle
+ * @see ::ngx_start_worker_processes
+ * @see ::ngx_worker_process_cycle
+ * @ingroup funcs
+ */
 int ngx_cdecl
-main(int argc, char *const *argv)
+main(int argc, char *const *argv) //(*argv)是一个const的char指针,
+// 由于(*argv)是const的,(*argv)[]可代表一个起始地址固定的char数组,所以:(*argv)[n]代表第n个命令行参数
+// Tips:C语言命令行参数传递:int main( int argc, char *argv[] ),argv应该是一个数组指针
 {
     ngx_buf_t        *b;
-    ngx_log_t        *log;
+    ngx_log_t        *log; // 初始化一个ngx_log_t对象
     ngx_uint_t        i;
-    ngx_cycle_t      *cycle, init_cycle;
+    ngx_cycle_t      *cycle, init_cycle; // 初始化两个ngx_cycle_t对象,分别用来表示临时进程和最终正式进程
     ngx_conf_dump_t  *cd;
     ngx_core_conf_t  *ccf;
 
@@ -199,6 +226,11 @@ main(int argc, char *const *argv)
         return 1;
     }
 
+    // 根据命令行传递的-c/-v/-V/?等参数设置在nginx.c/ngx_cycle.h文件中定义的一些全局flag变量.
+    // 当通过命令行传递的参数为-s时(nginx -s signal)表示此进程仅用于传递signal,
+    // ngx_get_options方法将会将ngx_signal全局变量设置为-s所传递的signal(非0)
+    // 引导进程执行:ngx_signal_process(cycle, ngx_signal)方法向正在运行的nginx服务发送signal,
+    // 发送完成后main方法就会退出(return 1),新启动的nginx进程也就此退出(不会再启动新的master进程等).
     if (ngx_get_options(argc, argv) != NGX_OK) {
         return 1;
     }
@@ -238,17 +270,24 @@ main(int argc, char *const *argv)
 
     ngx_memzero(&init_cycle, sizeof(ngx_cycle_t));
     init_cycle.log = log;
+
+   // 将&init_cycle赋给文件ngx_cycle.h中定义的全局变量ngx_cycle
     ngx_cycle = &init_cycle;
 
+    // 初始化init_cycle的内存池
     init_cycle.pool = ngx_create_pool(1024, log);
     if (init_cycle.pool == NULL) {
         return 1;
     }
 
+    // ngx_save_argv(*cycle, argc, **argv)函数用于将命令行传递的参数argv转到全局变量ngx_argv中
+    // 向ngx_save_argv函数传递&init_cycle是为了利用它的&init_cycle->log成员变量将日志信息输出到屏幕.
     if (ngx_save_argv(&init_cycle, argc, argv) != NGX_OK) {
         return 1;
     }
 
+    // ngx_process_options函数根据命令行带的prefix等目录参数来初始化临时进程对象init_cycle
+    // 包括初始化运行目录/配置目录等,并生成完整的nginx.conf配置文件路径
     if (ngx_process_options(&init_cycle) != NGX_OK) {
         return 1;
     }
@@ -273,6 +312,14 @@ main(int argc, char *const *argv)
         return 1;
     }
 
+    // 传入临时的ngx_cycle_t结构体对象&init_cycle,返回完整的正式的ngx_cycle_t结构体指针
+    // 并将其赋给main函数最开始定义的ngx_cycle_t指针变量cycle(正式)
+    // ngx_init_cycle函数在初始化正式ngx_cycle_t对象中的各种容器后,将会为读取/解析配置文件做准备:
+    // 每个模块的'"用来存储配置文件中各项配置的'数据结构'"的创建工作'将在此函数中进行:由于Nginx框架
+    // 只关心NGX_CORE_MODULE核心模块(为了降低框架复杂度),这里将会调用所有
+    // '核心模块'的create_conf方法(也只有核心模块才有此方法),其他模块则在他所从属的核心模块解析到
+    // 该核心模块感兴趣的配置项时(如当ngx_http_module解析到http配置项时)会调用模块约定的方法
+    // 来创建存储配置项的结构体....该函数执行的其他工作请参见函数源码内详细注释.
     cycle = ngx_init_cycle(&init_cycle);
     if (cycle == NULL) {
         if (ngx_test_config) {
@@ -309,26 +356,41 @@ main(int argc, char *const *argv)
         return 0;
     }
 
+    // 当通过命令行传递的参数为-s时(nginx -s signal)表示此进程仅用于传递signal,
+    // ngx_get_options方法将会将ngx_signal全局变量设置为'-s'所传递的signal(非0)
+    // 引导进程执行:ngx_signal_process(cycle, ngx_signal)方法向正在运行的nginx服务发送signal,
+    // 发送完成后main方法就会退出(return 1),新启动的nginx进程也就此退出(不会再启动新的master进程等).
     if (ngx_signal) {
         return ngx_signal_process(cycle, ngx_signal);
     }
 
     ngx_os_status(cycle->log);
 
+    // 将正式的ngx_cycle_t对象指针cycle赋给ngx_cycle.h文件中定义的全局变量ngx_cycle指针
     ngx_cycle = cycle;
 
+    // ngx_core_conf_t在ngx_cycle中定义,表示存储nginx.con中配置项的结构体类型
+    // ccf为调用ngx_get_conf宏得到的ngx_core_module模块相关配置内容
+    // ngx_get_conf宏在ngx_conf_file中定义:#define ngx_get_conf(conf_ctx, module) conf_ctx[module.index]
+    // cycle->conf_ctx保存着'所有模块'的'存储配置项的结构体'的指针,
+    // 它是一个存储着"指向另一个'指针数组'的指针"的数组:void ****conf_ctx
+    // ccf仅包含ngx_core_module模块的配置项
     ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
 
+    // ngx_process为在ngx_process_cycle.h中定义的全局变量,保存着nginx的运行进程模式
     if (ccf->master && ngx_process == NGX_PROCESS_SINGLE) {
         ngx_process = NGX_PROCESS_MASTER;
     }
 
 #if !(NGX_WIN32)
 
+    // ngx_process.c中定义的ngx_init_signals方法会初始化所有的信号
+    // 并利用sigaction将signal与ngx_signal_handler进行绑定
     if (ngx_init_signals(cycle->log) != NGX_OK) {
         return 1;
     }
 
+    // 如果配置文件设置daemon，以守护进程运行master
     if (!ngx_inherited && ccf->daemon) {
         if (ngx_daemon(cycle->log) != NGX_OK) {
             return 1;
@@ -360,13 +422,17 @@ main(int argc, char *const *argv)
 
     ngx_use_stderr = 0;
 
+    // 如果nginx.conf中配置为单进程模式,则调用ngx_single_process_cycle(cycle)启动单进程模式
     if (ngx_process == NGX_PROCESS_SINGLE) {
         ngx_single_process_cycle(cycle);
 
     } else {
+        // 否则调用ngx_master_process_cycle(cycle)来启动master/worker模式.
+        // 此处传入的cycle为通过ngx_init_cycle函数初始化后的那个ngx_cycle_t对象.
         ngx_master_process_cycle(cycle);
     }
 
+    // return 0代表程序正常启动,正常退出main函数.若未走到此步,中途已经return 1退出main函数则表示启动失败.
     return 0;
 }
 
@@ -784,6 +850,7 @@ ngx_get_options(int argc, char *const *argv)
 
             case 's':
                 if (*p) {
+                    // 将全局变量ngx_signal设为-s后面所传递的参数
                     ngx_signal = (char *) p;
 
                 } else if (argv[++i]) {
@@ -824,13 +891,6 @@ ngx_get_options(int argc, char *const *argv)
 static ngx_int_t
 ngx_save_argv(ngx_cycle_t *cycle, int argc, char *const *argv)
 {
-#if (NGX_FREEBSD)
-
-    ngx_os_argv = (char **) argv;
-    ngx_argc = argc;
-    ngx_argv = (char **) argv;
-
-#else
     size_t     len;
     ngx_int_t  i;
 
@@ -854,8 +914,6 @@ ngx_save_argv(ngx_cycle_t *cycle, int argc, char *const *argv)
     }
 
     ngx_argv[i] = NULL;
-
-#endif
 
     ngx_os_environ = environ;
 

@@ -10,11 +10,17 @@
 #include <ngx_event.h>
 #include <ngx_channel.h>
 
-
+/**
+ * @brief 用来描述进程接收到信号后的行为的结构体(用来描述'信号'的数据结构).
+ **/
 typedef struct {
+    // 需要处理的信号
     int     signo;
+    // 信号对应的字符串名称
     char   *signame;
+    // 信号对应的Nginx命令
     char   *name;
+    // 进程收到signo信号后就会回调的handler方法
     void  (*handler)(int signo);
 } ngx_signal_t;
 
@@ -36,6 +42,9 @@ ngx_int_t        ngx_last_process;
 ngx_process_t    ngx_processes[NGX_MAX_PROCESSES];
 
 
+/**
+ * @brief 信号数组, 用来定义进程将会处理的所有信号, 每个元素代表一种信号
+ **/
 ngx_signal_t  signals[] = {
     { ngx_signal_value(NGX_RECONFIGURE_SIGNAL),
       "SIG" ngx_value(NGX_RECONFIGURE_SIGNAL),
@@ -82,7 +91,11 @@ ngx_signal_t  signals[] = {
     { 0, NULL, "", NULL }
 };
 
-
+/**
+ * @brief 对fork()系统调用的封装; 初始化ngx_processes[]数组中的各ngx_process_t结构体元素.
+ * ngx_processes[]数组存储了master进程管理的所有worker进程的信息.worker进程也有ngx_processes[],
+ * 但是并不使用.
+ * */
 ngx_pid_t
 ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
     char *name, ngx_int_t respawn)
@@ -182,28 +195,34 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
 
     ngx_process_slot = s;
 
-
+    // fork 进程
     pid = fork();
 
     switch (pid) {
 
+    // -1 代表失败
     case -1:
         ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
                       "fork() failed while spawning \"%s\"", name);
         ngx_close_channel(ngx_processes[s].channel, cycle->log);
         return NGX_INVALID_PID;
 
+    // case 0代表子进程
     case 0:
         ngx_pid = ngx_getpid();
+        // fork成功后子进程(worker)直接调用工作进程循环代码函数:proc(cycle, data),
+        // 即ngx_process_cycle.c文件中的ngx_worker_process_cycle函数
+        //由于proc是死循环,子进程就不会执行switch后面的代码了
         proc(cycle, data);
         break;
-
+    // default代表父进程, 跳出switch语句,继续后面的流程,最终父进程将return pid,即子进程的pid.
     default:
         break;
     }
 
     ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "start %s %P", name, pid);
 
+    // 将子进程的信息存到ngx_processes数组中.
     ngx_processes[s].pid = pid;
     ngx_processes[s].exited = 0;
 
@@ -211,6 +230,7 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
         return pid;
     }
 
+    // 将子进程的信息存到ngx_processes数组中.
     ngx_processes[s].proc = proc;
     ngx_processes[s].data = data;
     ngx_processes[s].name = name;
@@ -330,6 +350,7 @@ ngx_signal_handler(int signo)
 
     switch (ngx_process) {
 
+    // master进程及single进程中处理信号：
     case NGX_PROCESS_MASTER:
     case NGX_PROCESS_SINGLE:
         switch (signo) {
@@ -396,6 +417,7 @@ ngx_signal_handler(int signo)
 
         break;
 
+    // worker进程中处理信号：
     case NGX_PROCESS_WORKER:
     case NGX_PROCESS_HELPER:
         switch (signo) {

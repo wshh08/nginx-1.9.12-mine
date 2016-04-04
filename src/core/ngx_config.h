@@ -1,7 +1,8 @@
 
-/*
- * Copyright (C) Igor Sysoev
- * Copyright (C) Nginx, Inc.
+/**
+ * @file ngx_config.h
+ * @brief ngx_config.h包含了:config/ngx_auto_headers.h和src/os/unix/ngx_linux/config.h
+ * 其他文件通过#include<ngx_config.h>来间接包含这2个头文件(提供系统类型等相关信息),此文件共 173 usages!
  */
 
 
